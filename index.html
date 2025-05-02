@@ -361,7 +361,7 @@
     }
 
     function startChat() {
-      document.getElementById('userIdDisplay').innerHTML = `<b>Welcome, ${USER_NAME}</b><br>User ID: ${USER_ID}`;
+      document.getElementById('userIdDisplay').innerHTML = `<b>Welcome, ${USER_NAME}</b>`;
       sb = new SendBird({ appId: APP_ID });
 
       sb.connect(USER_ID, function(user, error) {
@@ -372,6 +372,7 @@
         }
         // Update current user's nickname to full name
         sb.updateCurrentUserInfo(USER_NAME, null, function() {});
+        userIdToNameMap[USER_ID] = USER_NAME; // Store current user's name
         refreshChannelsList();
 
         // Create public channel
