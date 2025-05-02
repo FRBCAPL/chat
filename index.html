@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Sendbird Multi-Channel Chat with PIN and Full Names</title>
+  <title>Sendbird Multi-Channel Chat with PIN as User ID</title>
   <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/sendbird/3.1.13/SendBird.min.js"></script>
   <style>
@@ -248,7 +248,7 @@
           const pinCol = row.c[11];
           if (pinCol && pinCol.v && pinCol.v.toString() === pin) {
             USER_NAME = toProperCase(row.c[0]?.v?.toString().trim() || "Unknown");
-            USER_ID = USER_NAME.replace(/\s+/g, "_").toLowerCase();
+            USER_ID = pin; // Use PIN as user ID
             found = true;
             break;
           }
