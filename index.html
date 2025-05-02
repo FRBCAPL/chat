@@ -2,6 +2,8 @@
 <html>
 <head>
   <title>Sendbird Chat v3 Demo</title>
+  <!-- Axios must come first! -->
+  <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/sendbird/3.1.13/SendBird.min.js"></script>
   <style>
     #messages { border: 1px solid #ccc; height: 300px; overflow: auto; padding: 10px; margin-bottom: 10px; }
@@ -17,7 +19,7 @@
   <script>
     const APP_ID = 'AA3FE8A5-3D6A-4058-9C00-58C2508098DE';
     const USER_ID = 'user_' + Math.floor(Math.random() * 10000);
-    const TEST_USER = 'test_user_123'; // Make sure this user exists in your Sendbird dashboard
+    const TEST_USER = 'test_user_123';
 
     const sb = new SendBird({ appId: APP_ID });
 
