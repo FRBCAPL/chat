@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Sendbird Chat v3 Demo</title>
+  <title>Sendbird Multi-Channel Chat Demo</title>
   <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/sendbird/3.1.13/SendBird.min.js"></script>
   <style>
@@ -10,14 +10,102 @@
       color: #ccc;
       font-family: Arial, sans-serif;
     }
+    #container {
+      display: flex;
+      max-width: 900px;
+      margin: 30px auto;
+      border-radius: 10px;
+      background: #181818;
+      box-shadow: 0 0 20px #111;
+      overflow: hidden;
+    }
+    #sidebar {
+      width: 240px;
+      background: #121212;
+      border-right: 1px solid #333;
+      padding: 20px 10px 10px 10px;
+      box-sizing: border-box;
+      display: flex;
+      flex-direction: column;
+      min-height: 400px;
+    }
+    #sidebar h2 {
+      color: #D32F2F;
+      font-size: 1.2em;
+      margin-top: 0;
+      margin-bottom: 10px;
+      text-align: center;
+    }
+    #channelsList {
+      flex: 1;
+      overflow-y: auto;
+      margin-bottom: 10px;
+    }
+    .channel-item {
+      padding: 8px 12px;
+      margin-bottom: 6px;
+      border-radius: 5px;
+      cursor: pointer;
+      background: #222;
+      color: #ccc;
+      border: 1px solid #222;
+      transition: background 0.2s, border 0.2s;
+    }
+    .channel-item.active, .channel-item:hover {
+      background: #D32F2F;
+      color: #fff;
+      border: 1px solid #B71C1C;
+    }
+    #createChannelForm, #privateChatForm {
+      margin-bottom: 12px;
+      text-align: center;
+    }
+    #createChannelInput, #privateUserInput {
+      width: 80%;
+      padding: 7px;
+      border-radius: 4px;
+      border: 1px solid #333;
+      background: #222;
+      color: #fff;
+      margin-bottom: 5px;
+    }
+    #createChannelBtn, #privateChatBtn {
+      padding: 7px 13px;
+      background: #D32F2F;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      margin-left: 3px;
+      margin-bottom: 5px;
+    }
+    #createChannelBtn:hover, #privateChatBtn:hover {
+      background: #B71C1C;
+    }
+    #chatArea {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      padding: 16px;
+      min-width: 0;
+      min-height: 400px;
+    }
+    #currentChannelName {
+      color: #D32F2F;
+      font-size: 1.2em;
+      margin: 0 0 10px 0;
+      text-align: center;
+    }
     #messages {
       border: 1px solid #333;
       background: #181818;
       height: 300px;
-      overflow: auto;
+      overflow-y: auto;
       padding: 10px;
       margin-bottom: 10px;
       border-radius: 8px;
+      flex: 1;
+      min-height: 0;
     }
     #messages p {
       margin: 0 0 8px 0;
@@ -38,13 +126,19 @@
       text-align: left;
       margin-right: 20%;
     }
+    #inputRow {
+      display: flex;
+      align-items: center;
+      margin-top: 5px;
+    }
     #messageInput {
-      width: 70%;
+      flex: 1;
       padding: 8px;
       border-radius: 4px;
       border: 1px solid #333;
       background: #222;
       color: #fff;
+      margin-right: 8px;
     }
     #sendBtn {
       padding: 8px 15px;
@@ -52,25 +146,133 @@
       color: white;
       border: none;
       border-radius: 4px;
-      margin-left: 8px;
       cursor: pointer;
     }
     #sendBtn:hover {
       background: #B71C1C;
     }
+    #userIdDisplay {
+      font-size: 0.95em;
+      margin-bottom: 10px;
+      color: #888;
+      text-align: center;
+    }
   </style>
 </head>
 <body>
-  <h1>Sendbird Chat v3</h1>
-  <div id="messages"></div>
-  <input type="text" id="messageInput" placeholder="Type a message" />
-  <button id="sendBtn">Send</button>
+  <div id="container">
+    <div id="sidebar">
+      <div id="userIdDisplay"></div>
+      <h2>Channels</h2>
+      <div id="channelsList"></div>
+      <form id="createChannelForm" autocomplete="off">
+        <input type="text" id="createChannelInput" placeholder="New channel name" required />
+        <button type="submit" id="createChannelBtn">Create</button>
+      </form>
+      <form id="privateChatForm" autocomplete="off">
+        <input type="text" id="privateUserInput" placeholder="User ID for private chat" required />
+        <button type="submit" id="privateChatBtn">Private Chat</button>
+      </form>
+    </div>
+    <div id="chatArea">
+      <div id="currentChannelName">Loading...</div>
+      <div id="messages"></div>
+      <div id="inputRow">
+        <input type="text" id="messageInput" placeholder="Type a message" autocomplete="off" />
+        <button id="sendBtn">Send</button>
+      </div>
+    </div>
+  </div>
   <script>
+    // === CONFIG ===
     const APP_ID = 'AA3FE8A5-3D6A-4058-9C00-58C2508098DE';
     const USER_ID = 'user_' + Math.floor(Math.random() * 10000);
-    const TEST_USER = 'test_user_123';
+
+    // === INIT ===
+    document.getElementById('userIdDisplay').textContent = "Your User ID: " + USER_ID;
 
     const sb = new SendBird({ appId: APP_ID });
+    let currentChannel = null;
+    let channelHandler = null;
+
+    function renderMessage(msg) {
+      const p = document.createElement('p');
+      p.textContent = `${msg.sender ? msg.sender.userId : 'System'}: ${msg.message}`;
+      p.className = (msg.sender && msg.sender.userId === USER_ID) ? 'me' : 'other';
+      document.getElementById('messages').appendChild(p);
+    }
+
+    function clearMessages() {
+      document.getElementById('messages').innerHTML = '';
+    }
+
+    function loadMessages(channel) {
+      clearMessages();
+      document.getElementById('currentChannelName').textContent = channel.name || '(No Name)';
+      const messageListQuery = channel.createPreviousMessageListQuery();
+      messageListQuery.load(30, true, function(messages, error) {
+        if (!error) {
+          messages.forEach(renderMessage);
+          const messagesDiv = document.getElementById('messages');
+          messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        }
+      });
+    }
+
+    function setupChannelHandler(channel) {
+      // Remove old handler
+      if (channelHandler) sb.removeChannelHandler('handler');
+      channelHandler = new sb.ChannelHandler();
+      channelHandler.onMessageReceived = function(ch, message) {
+        if (currentChannel && ch.url === currentChannel.url) {
+          renderMessage(message);
+          const messagesDiv = document.getElementById('messages');
+          messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        }
+      };
+      sb.addChannelHandler('handler', channelHandler);
+    }
+
+    function switchChannel(channel) {
+      currentChannel = channel;
+      loadMessages(channel);
+      setupChannelHandler(channel);
+    }
+
+    function renderChannelsList(channels, activeUrl) {
+      const listDiv = document.getElementById('channelsList');
+      listDiv.innerHTML = '';
+      channels.forEach(channel => {
+        const div = document.createElement('div');
+        div.className = 'channel-item' + (channel.url === activeUrl ? ' active' : '');
+        div.textContent = channel.name + (channel.isDistinct ? ' (Private)' : '');
+        div.onclick = () => switchChannel(channel);
+        listDiv.appendChild(div);
+      });
+    }
+
+    function refreshChannelsList(selectUrl) {
+      const query = sb.GroupChannel.createMyGroupChannelListQuery();
+      query.limit = 30;
+      query.includeEmpty = true;
+      query.next(function(channels, error) {
+        if (!error) {
+          renderChannelsList(channels, selectUrl);
+          if (channels.length > 0) {
+            // If switching, switch to the selected one, else first one
+            let toSelect = channels[0];
+            if (selectUrl) {
+              const found = channels.find(c => c.url === selectUrl);
+              if (found) toSelect = found;
+            }
+            switchChannel(toSelect);
+          } else {
+            document.getElementById('currentChannelName').textContent = "(No Channels)";
+            clearMessages();
+          }
+        }
+      });
+    }
 
     sb.connect(USER_ID, function(user, error) {
       if (error) {
@@ -78,59 +280,64 @@
         console.error(error);
         return;
       }
-      sb.GroupChannel.createChannelWithUserIds([USER_ID, TEST_USER], true, 'Test Channel', '', '', function(channel, error) {
-        if (error) {
-          alert('Channel creation failed: ' + error.message);
-          console.error(error);
-          return;
-        }
-        const messagesDiv = document.getElementById('messages');
-        // Load previous messages
-        const messageListQuery = channel.createPreviousMessageListQuery();
-        messageListQuery.load(20, true, function(messages, error) {
-          if (!error) {
-            messages.forEach(msg => {
-              const p = document.createElement('p');
-              p.textContent = `${msg.sender.userId}: ${msg.message}`;
-              p.className = (msg.sender.userId === USER_ID) ? 'me' : 'other';
-              messagesDiv.appendChild(p);
-            });
+      refreshChannelsList();
+
+      // Create public channel
+      document.getElementById('createChannelForm').onsubmit = function(e) {
+        e.preventDefault();
+        const name = document.getElementById('createChannelInput').value.trim();
+        if (!name) return;
+        sb.GroupChannel.createChannel({
+          name: name,
+          isDistinct: false,
+          userIds: [USER_ID],
+          coverUrl: '',
+          customType: 'public'
+        }, function(channel, error) {
+          if (error) {
+            alert('Failed to create channel: ' + error.message);
+            return;
+          }
+          document.getElementById('createChannelInput').value = '';
+          refreshChannelsList(channel.url);
+        });
+      };
+
+      // Create private chat
+      document.getElementById('privateChatForm').onsubmit = function(e) {
+        e.preventDefault();
+        const otherUser = document.getElementById('privateUserInput').value.trim();
+        if (!otherUser || otherUser === USER_ID) return;
+        sb.GroupChannel.createChannelWithUserIds([USER_ID, otherUser], true, 'Private Chat with ' + otherUser, '', '', function(channel, error) {
+          if (error) {
+            alert('Failed to create private chat: ' + error.message);
+            return;
+          }
+          document.getElementById('privateUserInput').value = '';
+          refreshChannelsList(channel.url);
+        });
+      };
+
+      // Send message
+      document.getElementById('sendBtn').onclick = function() {
+        const input = document.getElementById('messageInput');
+        const msg = input.value.trim();
+        if (!msg || !currentChannel) return;
+        currentChannel.sendUserMessage(msg, function(message, error) {
+          if (error) {
+            alert('Send failed: ' + error.message);
+            console.error(error);
+          } else {
+            renderMessage(message);
+            const messagesDiv = document.getElementById('messages');
             messagesDiv.scrollTop = messagesDiv.scrollHeight;
+            input.value = '';
           }
         });
-        // Real-time incoming messages
-        const ChannelHandler = new sb.ChannelHandler();
-        ChannelHandler.onMessageReceived = function(channel, message) {
-          const p = document.createElement('p');
-          p.textContent = `${message.sender.userId}: ${message.message}`;
-          p.className = (message.sender.userId === USER_ID) ? 'me' : 'other';
-          messagesDiv.appendChild(p);
-          messagesDiv.scrollTop = messagesDiv.scrollHeight;
-        };
-        sb.addChannelHandler('UNIQUE_HANDLER_ID', ChannelHandler);
-        // Send messages
-        document.getElementById('sendBtn').onclick = function() {
-          const input = document.getElementById('messageInput');
-          const msg = input.value.trim();
-          if (!msg) return;
-          channel.sendUserMessage(msg, function(message, error) {
-            if (error) {
-              alert('Send failed: ' + error.message);
-              console.error(error);
-            } else {
-              const p = document.createElement('p');
-              p.textContent = `${message.sender.userId}: ${message.message}`;
-              p.className = 'me';
-              messagesDiv.appendChild(p);
-              messagesDiv.scrollTop = messagesDiv.scrollHeight;
-              input.value = '';
-            }
-          });
-        };
-        // Optional: Send on Enter key
-        document.getElementById('messageInput').addEventListener('keydown', function(e) {
-          if (e.key === 'Enter') document.getElementById('sendBtn').click();
-        });
+      };
+      // Send on Enter key
+      document.getElementById('messageInput').addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') document.getElementById('sendBtn').click();
       });
     });
   </script>
