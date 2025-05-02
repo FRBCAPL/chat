@@ -16,8 +16,8 @@
   <button id="sendBtn">Send</button>
   <script>
     const APP_ID = 'AA3FE8A5-3D6A-4058-9C00-58C2508098DE';
-    const USER_ID = 'user_' + Math.floor(Math.random() * 1000);
-    const TEST_USER = 'test_user_123';
+    const USER_ID = 'user_' + Math.floor(Math.random() * 10000);
+    const TEST_USER = 'test_user_123'; // Make sure this user exists in your Sendbird dashboard
 
     const sb = new SendBird({ appId: APP_ID });
 
