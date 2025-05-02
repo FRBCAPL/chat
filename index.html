@@ -3,7 +3,8 @@
 <head>
   <title>Sendbird Chat Fix</title>
   <!-- CRITICAL: Load Sendbird FIRST -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/sendbird/3.1.13/SendBird.min.js"></script>
+  <script src="https://unpkg.com/@sendbird/chat@4.6.0/dist/sendbird.min.js"></script>
+
   <style>
     #messages {
       border: 1px solid #ccc;
@@ -25,7 +26,9 @@
     const TEST_USER = 'test_user_123'; // Must exist in your Sendbird dashboard
 
     // Initialize Sendbird
-    const sb = new SendBird({ appId: APP_ID }); // Case-sensitive "SendBird"
+   const { SendbirdChat } = window.sendbird;
+const sb = SendbirdChat.init({ appId: APP_ID });
+
 
     sb.connect(USER_ID, (user, error) => {
       if (error) {
