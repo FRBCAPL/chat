@@ -2,13 +2,62 @@
 <html>
 <head>
   <title>Sendbird Chat v3 Demo</title>
-  <!-- Axios must come first! -->
   <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/sendbird/3.1.13/SendBird.min.js"></script>
   <style>
-    #messages { border: 1px solid #ccc; height: 300px; overflow: auto; padding: 10px; margin-bottom: 10px; }
-    #messageInput { width: 80%; padding: 8px; }
-    #sendBtn { padding: 8px 15px; background: #4CAF50; color: white; border: none; }
+    body {
+      background: #000;
+      color: #ccc;
+      font-family: Arial, sans-serif;
+    }
+    #messages {
+      border: 1px solid #333;
+      background: #181818;
+      height: 300px;
+      overflow: auto;
+      padding: 10px;
+      margin-bottom: 10px;
+      border-radius: 8px;
+    }
+    #messages p {
+      margin: 0 0 8px 0;
+      padding: 6px 10px;
+      border-radius: 6px;
+      max-width: 80%;
+      word-break: break-word;
+    }
+    #messages p.me {
+      background: #D32F2F;
+      color: #fff;
+      text-align: right;
+      margin-left: 20%;
+    }
+    #messages p.other {
+      background: #222;
+      color: #ccc;
+      text-align: left;
+      margin-right: 20%;
+    }
+    #messageInput {
+      width: 70%;
+      padding: 8px;
+      border-radius: 4px;
+      border: 1px solid #333;
+      background: #222;
+      color: #fff;
+    }
+    #sendBtn {
+      padding: 8px 15px;
+      background: #D32F2F;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      margin-left: 8px;
+      cursor: pointer;
+    }
+    #sendBtn:hover {
+      background: #B71C1C;
+    }
   </style>
 </head>
 <body>
@@ -43,11 +92,22 @@
             messages.forEach(msg => {
               const p = document.createElement('p');
               p.textContent = `${msg.sender.userId}: ${msg.message}`;
+              p.className = (msg.sender.userId === USER_ID) ? 'me' : 'other';
               messagesDiv.appendChild(p);
             });
             messagesDiv.scrollTop = messagesDiv.scrollHeight;
           }
         });
+        // Real-time incoming messages
+        const ChannelHandler = new sb.ChannelHandler();
+        ChannelHandler.onMessageReceived = function(channel, message) {
+          const p = document.createElement('p');
+          p.textContent = `${message.sender.userId}: ${message.message}`;
+          p.className = (message.sender.userId === USER_ID) ? 'me' : 'other';
+          messagesDiv.appendChild(p);
+          messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        };
+        sb.addChannelHandler('UNIQUE_HANDLER_ID', ChannelHandler);
         // Send messages
         document.getElementById('sendBtn').onclick = function() {
           const input = document.getElementById('messageInput');
@@ -60,12 +120,17 @@
             } else {
               const p = document.createElement('p');
               p.textContent = `${message.sender.userId}: ${message.message}`;
+              p.className = 'me';
               messagesDiv.appendChild(p);
               messagesDiv.scrollTop = messagesDiv.scrollHeight;
               input.value = '';
             }
           });
         };
+        // Optional: Send on Enter key
+        document.getElementById('messageInput').addEventListener('keydown', function(e) {
+          if (e.key === 'Enter') document.getElementById('sendBtn').click();
+        });
       });
     });
   </script>
