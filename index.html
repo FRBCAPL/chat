@@ -1,33 +1,40 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Sendbird Chat</title>
-<script src="https://unpkg.com/@sendbird/chat@4.6.0/dist/sendbird.min.js"></script>
-
-
+  <title>Sendbird Chat Fix</title>
+  <!-- CRITICAL: Load Sendbird FIRST -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/sendbird/3.1.13/SendBird.min.js"></script>
+  <style>
+    #messages {
+      border: 1px solid #ccc;
+      height: 300px;
+      overflow: auto;
+      padding: 10px;
+    }
+  </style>
 </head>
 <body>
-  <div id="messages" style="height:300px;overflow:auto;border:1px solid #ccc;"></div>
+  <div id="messages"></div>
   <input type="text" id="messageInput" placeholder="Type message" />
   <button id="sendBtn">Send</button>
 
   <script>
-    // CONFIGURATION
-    const APP_ID = 'AA3FE8A5-3D6A-4058-9C00-58C2508098DE';
+    // Configuration
+    const APP_ID = 'AA3FE8A5-3D6A-4058-9C00-58C2508098DE'; // Verify this is correct
     const USER_ID = 'user_' + Math.floor(Math.random() * 1000);
-    const TEST_USER = 'test_user_123'; // Create this user in your dashboard first!
+    const TEST_USER = 'test_user_123'; // Must exist in your Sendbird dashboard
 
-    // INITIALIZATION
-    const sb = new SendBird({ appId: APP_ID }); // Case-sensitive!
+    // Initialize Sendbird
+    const sb = new SendBird({ appId: APP_ID }); // Case-sensitive "SendBird"
 
     sb.connect(USER_ID, (user, error) => {
       if (error) {
         console.error('Connection failed:', error);
-        alert('Connection error - check console');
+        alert('Check console for errors');
         return;
       }
 
-      // CHANNEL CREATION
+      // Create channel
       sb.GroupChannel.createChannelWithUserIds(
         [USER_ID, TEST_USER],
         true, // Is distinct
@@ -41,20 +48,19 @@
             return;
           }
 
-          // MESSAGE HANDLING
+          // Message handling
           const messagesDiv = document.getElementById('messages');
           
           // Load previous messages
-          const messageListQuery = channel.createPreviousMessageListQuery();
-          messageListQuery.load(20, true, (messages, error) => {
+          channel.createPreviousMessageListQuery().load(20, true, (messages, error) => {
             if (!error) {
               messages.forEach(msg => {
-                messagesDiv.innerHTML += `<p><strong>${msg.sender.userId}:</strong> ${msg.message}</p>`;
+                messagesDiv.innerHTML += `<p>${msg.sender.userId}: ${msg.message}</p>`;
               });
             }
           });
 
-          // Send new messages
+          // Send messages
           document.getElementById('sendBtn').onclick = () => {
             const input = document.getElementById('messageInput');
             const msg = input.value.trim();
@@ -64,7 +70,7 @@
               if (error) {
                 console.error('Send error:', error);
               } else {
-                messagesDiv.innerHTML += `<p><strong>${message.sender.userId}:</strong> ${message.message}</p>`;
+                messagesDiv.innerHTML += `<p>${message.sender.userId}: ${message.message}</p>`;
                 messagesDiv.scrollTop = messagesDiv.scrollHeight;
                 input.value = '';
               }
