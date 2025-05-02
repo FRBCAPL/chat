@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Sendbird Multi-Channel Chat Demo</title>
+  <title>Sendbird Multi-Channel Chat with PIN</title>
   <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/sendbird/3.1.13/SendBird.min.js"></script>
   <style>
@@ -157,10 +157,33 @@
       color: #888;
       text-align: center;
     }
+    #pinSection {
+      max-width: 350px;
+      margin: 100px auto;
+      background: #181818;
+      padding: 30px 30px 20px 30px;
+      border-radius: 12px;
+      box-shadow: 0 0 20px #111;
+      text-align: center;
+    }
+    #pinInput, #pinSection button {
+      max-width: 200px;
+      margin: 0 auto 10px auto;
+      display: block;
+      width: 100%;
+      font-size: 1em;
+      padding: 10px;
+    }
   </style>
 </head>
 <body>
-  <div id="container">
+  <div id="pinSection">
+    <h2>Player Chat Portal</h2>
+    <input type="password" id="pinInput" placeholder="Enter your PIN" />
+    <button onclick="verifyPin()">Submit</button>
+    <div id="pinMessage" style="color:red; margin-top:10px;"></div>
+  </div>
+  <div id="container" style="display:none;">
     <div id="sidebar">
       <div id="userIdDisplay"></div>
       <h2>Channels</h2>
@@ -184,16 +207,54 @@
     </div>
   </div>
   <script>
-    // === CONFIG ===
+    // === PIN VERIFICATION CONFIG ===
+    const sheetID = "1tvMgMHsRwQxsR6lMNlSnztmwpK7fhZeNEyqjTqmRFRc";
+    const pinSheetName = "BCAPL SIGNUP"; // Adjust if needed
+
+    // === SENDIRD CONFIG ===
     const APP_ID = 'AA3FE8A5-3D6A-4058-9C00-58C2508098DE';
-    const USER_ID = 'user_' + Math.floor(Math.random() * 10000);
+    let USER_ID = '';
+    let USER_NAME = '';
 
-    // === INIT ===
-    document.getElementById('userIdDisplay').textContent = "Your User ID: " + USER_ID;
+    // PIN Verification
+    async function verifyPin() {
+      const pin = document.getElementById("pinInput").value.trim();
+      if (!pin) {
+        document.getElementById("pinMessage").innerText = "Please enter a PIN.";
+        return;
+      }
+      document.getElementById("pinMessage").innerText = "Checking PIN...";
+      try {
+        const url = `https://docs.google.com/spreadsheets/d/${sheetID}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(pinSheetName)}`;
+        const response = await fetch(url);
+        const text = await response.text();
+        const json = JSON.parse(text.substr(47).slice(0, -2));
+        const rows = json.table.rows;
+        let found = false;
+        for (let row of rows) {
+          const pinCol = row.c[11];
+          if (pinCol && pinCol.v && pinCol.v.toString() === pin) {
+            USER_NAME = row.c[0]?.v?.toString().trim() || "Unknown";
+            USER_ID = USER_NAME.replace(/\s+/g, "_").toLowerCase();
+            found = true;
+            break;
+          }
+        }
+        if (found) {
+          document.getElementById("pinSection").style.display = "none";
+          document.getElementById("container").style.display = "flex";
+          startChat();
+        } else {
+          document.getElementById("pinMessage").innerText = "Invalid PIN.";
+        }
+      } catch (error) {
+        console.error("PIN Error:", error);
+        document.getElementById("pinMessage").innerText = "Error verifying PIN.";
+      }
+    }
 
-    const sb = new SendBird({ appId: APP_ID });
-    let currentChannel = null;
-    let channelHandler = null;
+    // === CHAT LOGIC ===
+    let sb, currentChannel = null, channelHandler = null;
 
     function renderMessage(msg) {
       const p = document.createElement('p');
@@ -274,72 +335,78 @@
       });
     }
 
-    sb.connect(USER_ID, function(user, error) {
-      if (error) {
-        alert('Connection failed: ' + error.message);
-        console.error(error);
-        return;
-      }
-      refreshChannelsList();
+    function startChat() {
+      document.getElementById('userIdDisplay').innerHTML = `<b>Welcome, ${USER_NAME}</b><br>User ID: ${USER_ID}`;
+      sb = new SendBird({ appId: APP_ID });
 
-      // Create public channel
-      document.getElementById('createChannelForm').onsubmit = function(e) {
-        e.preventDefault();
-        const name = document.getElementById('createChannelInput').value.trim();
-        if (!name) return;
-        sb.GroupChannel.createChannel({
-          name: name,
-          isDistinct: false,
-          userIds: [USER_ID],
-          coverUrl: '',
-          customType: 'public'
-        }, function(channel, error) {
-          if (error) {
-            alert('Failed to create channel: ' + error.message);
-            return;
-          }
-          document.getElementById('createChannelInput').value = '';
-          refreshChannelsList(channel.url);
-        });
-      };
+      sb.connect(USER_ID, function(user, error) {
+        if (error) {
+          alert('Connection failed: ' + error.message);
+          console.error(error);
+          return;
+        }
+        sb.updateCurrentUserInfo(USER_NAME, null, function(){});
+        refreshChannelsList();
 
-      // Create private chat
-      document.getElementById('privateChatForm').onsubmit = function(e) {
-        e.preventDefault();
-        const otherUser = document.getElementById('privateUserInput').value.trim();
-        if (!otherUser || otherUser === USER_ID) return;
-        sb.GroupChannel.createChannelWithUserIds([USER_ID, otherUser], true, 'Private Chat with ' + otherUser, '', '', function(channel, error) {
-          if (error) {
-            alert('Failed to create private chat: ' + error.message);
-            return;
-          }
-          document.getElementById('privateUserInput').value = '';
-          refreshChannelsList(channel.url);
-        });
-      };
+        // Create public channel
+        document.getElementById('createChannelForm').onsubmit = function(e) {
+          e.preventDefault();
+          const name = document.getElementById('createChannelInput').value.trim();
+          if (!name) return;
+          sb.GroupChannel.createChannel({
+            name: name,
+            isDistinct: false,
+            userIds: [USER_ID],
+            coverUrl: '',
+            customType: 'public'
+          }, function(channel, error) {
+            if (error) {
+              alert('Failed to create channel: ' + error.message);
+              return;
+            }
+            document.getElementById('createChannelInput').value = '';
+            refreshChannelsList(channel.url);
+          });
+        };
 
-      // Send message
-      document.getElementById('sendBtn').onclick = function() {
-        const input = document.getElementById('messageInput');
-        const msg = input.value.trim();
-        if (!msg || !currentChannel) return;
-        currentChannel.sendUserMessage(msg, function(message, error) {
-          if (error) {
-            alert('Send failed: ' + error.message);
-            console.error(error);
-          } else {
-            renderMessage(message);
-            const messagesDiv = document.getElementById('messages');
-            messagesDiv.scrollTop = messagesDiv.scrollHeight;
-            input.value = '';
-          }
+        // Create private chat
+        document.getElementById('privateChatForm').onsubmit = function(e) {
+          e.preventDefault();
+          const otherUser = document.getElementById('privateUserInput').value.trim();
+          if (!otherUser || otherUser === USER_ID) return;
+          sb.GroupChannel.createChannelWithUserIds([USER_ID, otherUser], true, 'Private Chat with ' + otherUser, '', '', function(channel, error) {
+            if (error) {
+              alert('Failed to create private chat: ' + error.message);
+              return;
+            }
+            document.getElementById('privateUserInput').value = '';
+            refreshChannelsList(channel.url);
+          });
+        };
+
+        // Send message
+        document.getElementById('sendBtn').onclick = function() {
+          const input = document.getElementById('messageInput');
+          const msg = input.value.trim();
+          if (!msg || !currentChannel) return;
+          currentChannel.sendUserMessage(msg, function(message, error) {
+            if (error) {
+              alert('Send failed: ' + error.message);
+              console.error(error);
+            } else {
+              renderMessage(message);
+              const messagesDiv = document.getElementById('messages');
+              messagesDiv.scrollTop = messagesDiv.scrollHeight;
+              input.value = '';
+            }
+          });
+        };
+        // Send on Enter key
+        document.getElementById('messageInput').addEventListener('keydown', function(e) {
+          if (e.key === 'Enter') document.getElementById('sendBtn').click();
         });
-      };
-      // Send on Enter key
-      document.getElementById('messageInput').addEventListener('keydown', function(e) {
-        if (e.key === 'Enter') document.getElementById('sendBtn').click();
       });
-    });
+    }
   </script>
 </body>
 </html>
