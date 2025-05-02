@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Sendbird Multi-Channel Chat with PIN</title>
+  <title>Sendbird Multi-Channel Chat with PIN and Full Names</title>
   <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/sendbird/3.1.13/SendBird.min.js"></script>
   <style>
@@ -207,14 +207,27 @@
     </div>
   </div>
   <script>
+    // Capitalize each word in the full name
+    function toProperCase(str) {
+      return str
+        .toLowerCase()
+        .split(' ')
+        .filter(Boolean)
+        .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+        .join(' ');
+    }
+
     // === PIN VERIFICATION CONFIG ===
     const sheetID = "1tvMgMHsRwQxsR6lMNlSnztmwpK7fhZeNEyqjTqmRFRc";
     const pinSheetName = "BCAPL SIGNUP"; // Adjust if needed
 
-    // === SENDIRD CONFIG ===
+    // === SENDBIRD CONFIG ===
     const APP_ID = 'AA3FE8A5-3D6A-4058-9C00-58C2508098DE';
     let USER_ID = '';
     let USER_NAME = '';
+
+    // Map userId → fullName for display in chat
+    const userIdToNameMap = {};
 
     // PIN Verification
     async function verifyPin() {
@@ -234,7 +247,7 @@
         for (let row of rows) {
           const pinCol = row.c[11];
           if (pinCol && pinCol.v && pinCol.v.toString() === pin) {
-            USER_NAME = row.c[0]?.v?.toString().trim() || "Unknown";
+            USER_NAME = toProperCase(row.c[0]?.v?.toString().trim() || "Unknown");
             USER_ID = USER_NAME.replace(/\s+/g, "_").toLowerCase();
             found = true;
             break;
@@ -256,9 +269,16 @@
     // === CHAT LOGIC ===
     let sb, currentChannel = null, channelHandler = null;
 
+    // Helper: get display name for userId, fallback to userId
+    function getDisplayName(userId) {
+      return userIdToNameMap[userId] || userId;
+    }
+
+    // Render message with full name
     function renderMessage(msg) {
       const p = document.createElement('p');
-      p.textContent = `${msg.sender ? msg.sender.userId : 'System'}: ${msg.message}`;
+      const senderName = msg.sender ? getDisplayName(msg.sender.userId) : 'System';
+      p.textContent = `${senderName}: ${msg.message}`;
       p.className = (msg.sender && msg.sender.userId === USER_ID) ? 'me' : 'other';
       document.getElementById('messages').appendChild(p);
     }
@@ -268,7 +288,8 @@
     }
 
     function loadMessages(channel) {
-      clearMessages();
+      // Do NOT clear messages here to keep old messages
+      // Just load previous messages and append
       document.getElementById('currentChannelName').textContent = channel.name || '(No Name)';
       const messageListQuery = channel.createPreviousMessageListQuery();
       messageListQuery.load(30, true, function(messages, error) {
@@ -281,7 +302,6 @@
     }
 
     function setupChannelHandler(channel) {
-      // Remove old handler
       if (channelHandler) sb.removeChannelHandler('handler');
       channelHandler = new sb.ChannelHandler();
       channelHandler.onMessageReceived = function(ch, message) {
@@ -304,6 +324,13 @@
       const listDiv = document.getElementById('channelsList');
       listDiv.innerHTML = '';
       channels.forEach(channel => {
+        // Update userIdToNameMap for members of this channel
+        channel.members.forEach(m => {
+          if (m.userId && m.nickname) {
+            userIdToNameMap[m.userId] = m.nickname;
+          }
+        });
+
         const div = document.createElement('div');
         div.className = 'channel-item' + (channel.url === activeUrl ? ' active' : '');
         div.textContent = channel.name + (channel.isDistinct ? ' (Private)' : '');
@@ -320,7 +347,6 @@
         if (!error) {
           renderChannelsList(channels, selectUrl);
           if (channels.length > 0) {
-            // If switching, switch to the selected one, else first one
             let toSelect = channels[0];
             if (selectUrl) {
               const found = channels.find(c => c.url === selectUrl);
@@ -329,7 +355,6 @@
             switchChannel(toSelect);
           } else {
             document.getElementById('currentChannelName').textContent = "(No Channels)";
-            clearMessages();
           }
         }
       });
@@ -345,7 +370,8 @@
           console.error(error);
           return;
         }
-        sb.updateCurrentUserInfo(USER_NAME, null, function(){});
+        // Update current user's nickname to full name
+        sb.updateCurrentUserInfo(USER_NAME, null, function() {});
         refreshChannelsList();
 
         // Create public channel
