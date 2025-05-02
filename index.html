@@ -1,179 +1,34 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Sendbird Multi-Channel Chat with PIN as User ID</title>
+  <title>Sendbird Multi-Channel Chat with PIN+Name User ID</title>
   <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/sendbird/3.1.13/SendBird.min.js"></script>
   <style>
-    body {
-      background: #000;
-      color: #ccc;
-      font-family: Arial, sans-serif;
-    }
-    #container {
-      display: flex;
-      max-width: 900px;
-      margin: 30px auto;
-      border-radius: 10px;
-      background: #181818;
-      box-shadow: 0 0 20px #111;
-      overflow: hidden;
-    }
-    #sidebar {
-      width: 240px;
-      background: #121212;
-      border-right: 1px solid #333;
-      padding: 20px 10px 10px 10px;
-      box-sizing: border-box;
-      display: flex;
-      flex-direction: column;
-      min-height: 400px;
-    }
-    #sidebar h2 {
-      color: #D32F2F;
-      font-size: 1.2em;
-      margin-top: 0;
-      margin-bottom: 10px;
-      text-align: center;
-    }
-    #channelsList {
-      flex: 1;
-      overflow-y: auto;
-      margin-bottom: 10px;
-    }
-    .channel-item {
-      padding: 8px 12px;
-      margin-bottom: 6px;
-      border-radius: 5px;
-      cursor: pointer;
-      background: #222;
-      color: #ccc;
-      border: 1px solid #222;
-      transition: background 0.2s, border 0.2s;
-    }
-    .channel-item.active, .channel-item:hover {
-      background: #D32F2F;
-      color: #fff;
-      border: 1px solid #B71C1C;
-    }
-    #createChannelForm, #privateChatForm {
-      margin-bottom: 12px;
-      text-align: center;
-    }
-    #createChannelInput, #privateUserInput {
-      width: 80%;
-      padding: 7px;
-      border-radius: 4px;
-      border: 1px solid #333;
-      background: #222;
-      color: #fff;
-      margin-bottom: 5px;
-    }
-    #createChannelBtn, #privateChatBtn {
-      padding: 7px 13px;
-      background: #D32F2F;
-      color: white;
-      border: none;
-      border-radius: 4px;
-      cursor: pointer;
-      margin-left: 3px;
-      margin-bottom: 5px;
-    }
-    #createChannelBtn:hover, #privateChatBtn:hover {
-      background: #B71C1C;
-    }
-    #chatArea {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      padding: 16px;
-      min-width: 0;
-      min-height: 400px;
-    }
-    #currentChannelName {
-      color: #D32F2F;
-      font-size: 1.2em;
-      margin: 0 0 10px 0;
-      text-align: center;
-    }
-    #messages {
-      border: 1px solid #333;
-      background: #181818;
-      height: 300px;
-      overflow-y: auto;
-      padding: 10px;
-      margin-bottom: 10px;
-      border-radius: 8px;
-      flex: 1;
-      min-height: 0;
-    }
-    #messages p {
-      margin: 0 0 8px 0;
-      padding: 6px 10px;
-      border-radius: 6px;
-      max-width: 80%;
-      word-break: break-word;
-    }
-    #messages p.me {
-      background: #D32F2F;
-      color: #fff;
-      text-align: right;
-      margin-left: 20%;
-    }
-    #messages p.other {
-      background: #222;
-      color: #ccc;
-      text-align: left;
-      margin-right: 20%;
-    }
-    #inputRow {
-      display: flex;
-      align-items: center;
-      margin-top: 5px;
-    }
-    #messageInput {
-      flex: 1;
-      padding: 8px;
-      border-radius: 4px;
-      border: 1px solid #333;
-      background: #222;
-      color: #fff;
-      margin-right: 8px;
-    }
-    #sendBtn {
-      padding: 8px 15px;
-      background: #D32F2F;
-      color: white;
-      border: none;
-      border-radius: 4px;
-      cursor: pointer;
-    }
-    #sendBtn:hover {
-      background: #B71C1C;
-    }
-    #userIdDisplay {
-      font-size: 0.95em;
-      margin-bottom: 10px;
-      color: #888;
-      text-align: center;
-    }
-    #pinSection {
-      max-width: 350px;
-      margin: 100px auto;
-      background: #181818;
-      padding: 30px 30px 20px 30px;
-      border-radius: 12px;
-      box-shadow: 0 0 20px #111;
-      text-align: center;
-    }
-    #pinInput, #pinSection button {
-      max-width: 200px;
-      margin: 0 auto 10px auto;
-      display: block;
-      width: 100%;
-      font-size: 1em;
-      padding: 10px;
-    }
+    body { background: #000; color: #ccc; font-family: Arial, sans-serif; }
+    #container { display: flex; max-width: 900px; margin: 30px auto; border-radius: 10px; background: #181818; box-shadow: 0 0 20px #111; overflow: hidden; }
+    #sidebar { width: 240px; background: #121212; border-right: 1px solid #333; padding: 20px 10px 10px 10px; box-sizing: border-box; display: flex; flex-direction: column; min-height: 400px; }
+    #sidebar h2 { color: #D32F2F; font-size: 1.2em; margin-top: 0; margin-bottom: 10px; text-align: center; }
+    #channelsList { flex: 1; overflow-y: auto; margin-bottom: 10px; }
+    .channel-item { padding: 8px 12px; margin-bottom: 6px; border-radius: 5px; cursor: pointer; background: #222; color: #ccc; border: 1px solid #222; transition: background 0.2s, border 0.2s; }
+    .channel-item.active, .channel-item:hover { background: #D32F2F; color: #fff; border: 1px solid #B71C1C; }
+    #createChannelForm, #privateChatForm { margin-bottom: 12px; text-align: center; }
+    #createChannelInput, #privateUserInput { width: 80%; padding: 7px; border-radius: 4px; border: 1px solid #333; background: #222; color: #fff; margin-bottom: 5px; }
+    #createChannelBtn, #privateChatBtn { padding: 7px 13px; background: #D32F2F; color: white; border: none; border-radius: 4px; cursor: pointer; margin-left: 3px; margin-bottom: 5px; }
+    #createChannelBtn:hover, #privateChatBtn:hover { background: #B71C1C; }
+    #chatArea { flex: 1; display: flex; flex-direction: column; padding: 16px; min-width: 0; min-height: 400px; }
+    #currentChannelName { color: #D32F2F; font-size: 1.2em; margin: 0 0 10px 0; text-align: center; }
+    #messages { border: 1px solid #333; background: #181818; height: 300px; overflow-y: auto; padding: 10px; margin-bottom: 10px; border-radius: 8px; flex: 1; min-height: 0; }
+    #messages p { margin: 0 0 8px 0; padding: 6px 10px; border-radius: 6px; max-width: 80%; word-break: break-word; }
+    #messages p.me { background: #D32F2F; color: #fff; text-align: right; margin-left: 20%; }
+    #messages p.other { background: #222; color: #ccc; text-align: left; margin-right: 20%; }
+    #inputRow { display: flex; align-items: center; margin-top: 5px; }
+    #messageInput { flex: 1; padding: 8px; border-radius: 4px; border: 1px solid #333; background: #222; color: #fff; margin-right: 8px; }
+    #sendBtn { padding: 8px 15px; background: #D32F2F; color: white; border: none; border-radius: 4px; cursor: pointer; }
+    #sendBtn:hover { background: #B71C1C; }
+    #userIdDisplay { font-size: 0.95em; margin-bottom: 10px; color: #888; text-align: center; }
+    #pinSection { max-width: 350px; margin: 100px auto; background: #181818; padding: 30px 30px 20px 30px; border-radius: 12px; box-shadow: 0 0 20px #111; text-align: center; }
+    #pinInput, #pinSection button { max-width: 200px; margin: 0 auto 10px auto; display: block; width: 100%; font-size: 1em; padding: 10px; }
   </style>
 </head>
 <body>
@@ -207,7 +62,6 @@
     </div>
   </div>
   <script>
-    // Capitalize each word in the full name
     function toProperCase(str) {
       return str
         .toLowerCase()
@@ -217,19 +71,13 @@
         .join(' ');
     }
 
-    // === PIN VERIFICATION CONFIG ===
     const sheetID = "1tvMgMHsRwQxsR6lMNlSnztmwpK7fhZeNEyqjTqmRFRc";
-    const pinSheetName = "BCAPL SIGNUP"; // Adjust if needed
-
-    // === SENDBIRD CONFIG ===
+    const pinSheetName = "BCAPL SIGNUP";
     const APP_ID = 'AA3FE8A5-3D6A-4058-9C00-58C2508098DE';
     let USER_ID = '';
     let USER_NAME = '';
-
-    // Map userId → fullName for display in chat
     const userIdToNameMap = {};
 
-    // PIN Verification
     async function verifyPin() {
       const pin = document.getElementById("pinInput").value.trim();
       if (!pin) {
@@ -248,7 +96,7 @@
           const pinCol = row.c[11];
           if (pinCol && pinCol.v && pinCol.v.toString() === pin) {
             USER_NAME = toProperCase(row.c[0]?.v?.toString().trim() || "Unknown");
-            USER_ID = pin.toString(); // Ensure PIN is a string
+            USER_ID = pin.toString() + "_" + USER_NAME.replace(/\s+/g, "_").toLowerCase();
             found = true;
             break;
           }
@@ -266,15 +114,12 @@
       }
     }
 
-    // === CHAT LOGIC ===
     let sb, currentChannel = null, channelHandler = null;
 
-    // Helper: get display name for userId, fallback to userId
     function getDisplayName(userId) {
       return userIdToNameMap[userId] || userId;
     }
 
-    // Render message with full name
     function renderMessage(msg) {
       const p = document.createElement('p');
       const senderName = msg.sender ? getDisplayName(msg.sender.userId) : 'System';
@@ -288,8 +133,6 @@
     }
 
     function loadMessages(channel) {
-      // Do NOT clear messages here to keep old messages
-      // Just load previous messages and append
       document.getElementById('currentChannelName').textContent = channel.name || '(No Name)';
       const messageListQuery = channel.createPreviousMessageListQuery();
       messageListQuery.load(30, true, function(messages, error) {
@@ -297,6 +140,8 @@
           messages.forEach(renderMessage);
           const messagesDiv = document.getElementById('messages');
           messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        } else {
+          console.error("Error loading messages:", error);
         }
       });
     }
@@ -324,13 +169,11 @@
       const listDiv = document.getElementById('channelsList');
       listDiv.innerHTML = '';
       channels.forEach(channel => {
-        // Update userIdToNameMap for members of this channel
         channel.members.forEach(m => {
           if (m.userId && m.nickname) {
             userIdToNameMap[m.userId] = m.nickname;
           }
         });
-
         const div = document.createElement('div');
         div.className = 'channel-item' + (channel.url === activeUrl ? ' active' : '');
         div.textContent = channel.name + (channel.isDistinct ? ' (Private)' : '');
@@ -356,6 +199,8 @@
           } else {
             document.getElementById('currentChannelName').textContent = "(No Channels)";
           }
+        } else {
+          console.error("Error loading channel list:", error);
         }
       });
     }
@@ -370,12 +215,10 @@
           console.error(error);
           return;
         }
-        // Update current user's nickname to full name
-        sb.updateCurrentUserInfo(USER_NAME, null, function() {});
-        userIdToNameMap[USER_ID] = USER_NAME; // Store current user's name
+        sb.updateCurrentUserInfo(USER_NAME, null, function(){});
+        userIdToNameMap[USER_ID] = USER_NAME;
         refreshChannelsList();
 
-        // Create public channel
         document.getElementById('createChannelForm').onsubmit = function(e) {
           e.preventDefault();
           const name = document.getElementById('createChannelInput').value.trim();
@@ -383,12 +226,13 @@
           sb.GroupChannel.createChannel({
             name: name,
             isDistinct: false,
-            userIds: [USER_ID],
+            user_ids: [USER_ID],
             coverUrl: '',
             customType: 'public'
           }, function(channel, error) {
             if (error) {
               alert('Failed to create channel: ' + error.message);
+              console.error(error);
               return;
             }
             document.getElementById('createChannelInput').value = '';
@@ -396,22 +240,28 @@
           });
         };
 
-        // Create private chat
         document.getElementById('privateChatForm').onsubmit = function(e) {
           e.preventDefault();
           const otherUser = document.getElementById('privateUserInput').value.trim();
           if (!otherUser || otherUser === USER_ID) return;
-          sb.GroupChannel.createChannelWithUserIds([USER_ID, otherUser], true, 'Private Chat with ' + otherUser, '', '', function(channel, error) {
-            if (error) {
-              alert('Failed to create private chat: ' + error.message);
-              return;
+          sb.GroupChannel.createChannelWithUserIds(
+            [USER_ID, otherUser].map(String),
+            true,
+            'Private Chat with ' + otherUser,
+            '',
+            '',
+            function(channel, error) {
+              if (error) {
+                alert('Failed to create private chat: ' + error.message);
+                console.error(error);
+                return;
+              }
+              document.getElementById('privateUserInput').value = '';
+              refreshChannelsList(channel.url);
             }
-            document.getElementById('privateUserInput').value = '';
-            refreshChannelsList(channel.url);
-          });
+          );
         };
 
-        // Send message
         document.getElementById('sendBtn').onclick = function() {
           const input = document.getElementById('messageInput');
           const msg = input.value.trim();
@@ -428,7 +278,6 @@
             }
           });
         };
-        // Send on Enter key
         document.getElementById('messageInput').addEventListener('keydown', function(e) {
           if (e.key === 'Enter') document.getElementById('sendBtn').click();
         });
