@@ -1,72 +1,140 @@
+<!DOCTYPE html>
 <html>
 <head>
-  <title>Sendbird Chat v3 Demo</title>
-  <!-- Axios must come first! -->
-  <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+  <title>Sendbird Chat with PIN</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/sendbird/3.1.13/SendBird.min.js"></script>
   <style>
-    #messages { border: 1px solid #ccc; height: 300px; overflow: auto; padding: 10px; margin-bottom: 10px; }
-    #messageInput { width: 80%; padding: 8px; }
-    #sendBtn { padding: 8px 15px; background: #4CAF50; color: white; border: none; }
+    body { background: #000; color: #ccc; font-family: Arial, sans-serif; }
+    #messages { border: 1px solid #333; height: 300px; overflow: auto; padding: 10px; margin-bottom: 10px; background: #181818; }
+    #messageInput { width: 80%; padding: 8px; background: #222; color: #fff; border: 1px solid #333; }
+    #sendBtn { padding: 8px 15px; background: #D32F2F; color: white; border: none; cursor: pointer; }
+    #pinSection { max-width: 300px; margin: 50px auto; text-align: center; }
   </style>
 </head>
 <body>
-  <h1>Sendbird Chat v3</h1>
-  <div id="messages"></div>
-  <input type="text" id="messageInput" placeholder="Type a message" />
-  <button id="sendBtn">Send</button>
-  <script>
-    const APP_ID = 'AA3FE8A5-3D6A-4058-9C00-58C2508098DE';
-    const USER_ID = 'user_' + Math.floor(Math.random() * 10000);
-    const TEST_USER = 'test_user_123';
+  <div id="pinSection">
+    <h2>Player Chat Portal</h2>
+    <input type="password" id="pinInput" placeholder="Enter your PIN" />
+    <button onclick="verifyPin()">Submit</button>
+    <div id="pinMessage" style="color:red; margin-top:10px;"></div>
+  </div>
+  
+  <div id="chatSection" style="display:none;">
+    <div id="userWelcome"></div>
+    <div id="messages"></div>
+    <input type="text" id="messageInput" placeholder="Type a message" />
+    <button id="sendBtn">Send</button>
+  </div>
 
-    const sb = new SendBird({ appId: APP_ID });
+<script>
+const APP_ID = 'AA3FE8A5-3D6A-4058-9C00-58C2508098DE';
+const sheetID = "1tvMgMHsRwQxsR6lMNlSnztmwpK7fhZeNEyqjTqmRFRc";
+const pinSheetName = "BCAPL SIGNUP";
+const TEST_USER = "test_user_123"; // Must exist in Sendbird dashboard
 
-    sb.connect(USER_ID, function(user, error) {
-      if (error) {
-        alert('Connection failed: ' + error.message);
-        console.error(error);
-        return;
-      }
-      sb.GroupChannel.createChannelWithUserIds([USER_ID, TEST_USER], true, 'Test Channel', '', '', function(channel, error) {
-        if (error) {
-          alert('Channel creation failed: ' + error.message);
-          console.error(error);
-          return;
-        }
-        const messagesDiv = document.getElementById('messages');
-        // Load previous messages
-        const messageListQuery = channel.createPreviousMessageListQuery();
-        messageListQuery.load(20, true, function(messages, error) {
-          if (!error) {
-            messages.forEach(msg => {
-              const p = document.createElement('p');
-              p.textContent = `${msg.sender.userId}: ${msg.message}`;
-              messagesDiv.appendChild(p);
-            });
-            messagesDiv.scrollTop = messagesDiv.scrollHeight;
-          }
-        });
-        // Send messages
-        document.getElementById('sendBtn').onclick = function() {
-          const input = document.getElementById('messageInput');
-          const msg = input.value.trim();
-          if (!msg) return;
-          channel.sendUserMessage(msg, function(message, error) {
-            if (error) {
-              alert('Send failed: ' + error.message);
-              console.error(error);
-            } else {
-              const p = document.createElement('p');
-              p.textContent = `${message.sender.userId}: ${message.message}`;
-              messagesDiv.appendChild(p);
-              messagesDiv.scrollTop = messagesDiv.scrollHeight;
-              input.value = '';
-            }
-          });
-        };
-      });
+let sb, channel, USER_ID, USER_NAME;
+
+async function verifyPin() {
+  const pin = document.getElementById("pinInput").value.trim();
+  if (!pin) return showPinError("Please enter a PIN");
+  
+  try {
+    const url = `https://docs.google.com/spreadsheets/d/${sheetID}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(pinSheetName)}`;
+    const response = await fetch(url);
+    const data = await response.text();
+    const json = JSON.parse(data.substr(47).slice(0, -2));
+    
+    const userRow = json.table.rows.find(row => 
+      row.c[11]?.v?.toString() === pin
+    );
+    
+    if (!userRow) return showPinError("Invalid PIN");
+    
+    USER_NAME = toProperCase(userRow.c[0].v);
+    USER_ID = pin + "_" + userRow.c[0].v.replace(/\s+/g, "_").toLowerCase();
+    initChat();
+    
+  } catch (error) {
+    showPinError("Error verifying PIN");
+    console.error(error);
+  }
+}
+
+function initChat() {
+  sb = new SendBird({ appId: APP_ID });
+  
+  sb.connect(USER_ID, (user, error) => {
+    if (error) return handleError("Connection failed", error);
+    
+    sb.updateCurrentUserInfo(USER_NAME, null);
+    document.getElementById("pinSection").style.display = "none";
+    document.getElementById("chatSection").style.display = "block";
+    document.getElementById("userWelcome").innerHTML = `<b>Welcome, ${USER_NAME}</b>`;
+    createOrJoinChannel();
+  });
+}
+
+function createOrJoinChannel() {
+  sb.GroupChannel.createChannelWithUserIds(
+    [USER_ID, TEST_USER], // Array of user IDs (strings)
+    true,
+    "General Chat",
+    "",
+    "",
+    function(newChannel, error) {
+      if (error) return handleError("Channel creation failed", error);
+      channel = newChannel;
+      setupChannel();
+    }
+  );
+}
+
+function setupChannel() {
+  // Load message history
+  const query = channel.createPreviousMessageListQuery();
+  query.load(100, true, (messages, error) => {
+    if (!error) messages.forEach(appendMessage);
+  });
+
+  // Real-time messages
+  const handler = new sb.ChannelHandler();
+  handler.onMessageReceived = (targetChannel, message) => {
+    if (channel.url === targetChannel.url) appendMessage(message);
+  };
+  sb.addChannelHandler('main_handler', handler);
+
+  // Send message handler
+  document.getElementById("sendBtn").onclick = () => {
+    const message = document.getElementById("messageInput").value.trim();
+    if (!message) return;
+    channel.sendUserMessage(message, (sentMessage, error) => {
+      if (error) return handleError("Send failed", error);
+      document.getElementById("messageInput").value = "";
+      // appendMessage(sentMessage); // Will be handled by onMessageReceived
     });
-  </script>
+  };
+}
+
+function appendMessage(msg) {
+  const div = document.createElement("div");
+  div.textContent = `${msg.sender.nickname}: ${msg.message}`;
+  div.style.color = (msg.sender.userId === USER_ID) ? "#D32F2F" : "#ccc";
+  document.getElementById("messages").appendChild(div);
+  document.getElementById("messages").scrollTop = document.getElementById("messages").scrollHeight;
+}
+
+function toProperCase(str) {
+  return str.toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
+}
+
+function showPinError(message) {
+  document.getElementById("pinMessage").textContent = message;
+}
+
+function handleError(context, error) {
+  console.error(context, error);
+  alert(`${context}: ${error.message}`);
+}
+</script>
 </body>
 </html>
