@@ -1,72 +1,175 @@
+<!DOCTYPE html>
 <html>
 <head>
-  <title>Sendbird Chat v3 Demo</title>
-  <!-- Axios must come first! -->
-  <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+  <title>Sendbird PIN Chat</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/sendbird/3.1.13/SendBird.min.js"></script>
   <style>
-    #messages { border: 1px solid #ccc; height: 300px; overflow: auto; padding: 10px; margin-bottom: 10px; }
-    #messageInput { width: 80%; padding: 8px; }
-    #sendBtn { padding: 8px 15px; background: #4CAF50; color: white; border: none; }
+    body { background: #000; color: #ccc; font-family: Arial, sans-serif; }
+    #messages { border: 1px solid #333; height: 300px; overflow: auto; padding: 10px; margin-bottom: 10px; background: #181818; }
+    #messageInput { width: 80%; padding: 8px; background: #222; color: #fff; border: 1px solid #333; }
+    #sendBtn { padding: 8px 15px; background: #D32F2F; color: white; border: none; cursor: pointer; }
+    #pinSection { max-width: 350px; margin: 50px auto; text-align: center; }
+    #chatSection { max-width: 600px; margin: 30px auto; }
+    #userWelcome { margin-bottom: 10px; color: #D32F2F; }
   </style>
 </head>
 <body>
-  <h1>Sendbird Chat v3</h1>
-  <div id="messages"></div>
-  <input type="text" id="messageInput" placeholder="Type a message" />
-  <button id="sendBtn">Send</button>
-  <script>
-    const APP_ID = 'AA3FE8A5-3D6A-4058-9C00-58C2508098DE';
-    const USER_ID = 'user_' + Math.floor(Math.random() * 10000);
-    const TEST_USER = 'test_user_123';
+  <div id="pinSection">
+    <h2>Player Chat Portal</h2>
+    <input type="password" id="pinInput" placeholder="Enter your PIN" />
+    <button onclick="verifyPin()">Submit</button>
+    <div id="pinMessage" style="color:red; margin-top:10px;"></div>
+  </div>
+  
+  <div id="chatSection" style="display:none;">
+    <div id="userWelcome"></div>
+    <div id="messages"></div>
+    <input type="text" id="messageInput" placeholder="Type a message" />
+    <button id="sendBtn">Send</button>
+  </div>
 
-    const sb = new SendBird({ appId: APP_ID });
+<script>
+const APP_ID = 'AA3FE8A5-3D6A-4058-9C00-58C2508098DE';
+const sheetID = "1tvMgMHsRwQxsR6lMNlSnztmwpK7fhZeNEyqjTqmRFRc";
+const pinSheetName = "BCAPL SIGNUP";
+const CHANNEL_NAME = "Players General Chat";
 
-    sb.connect(USER_ID, function(user, error) {
-      if (error) {
-        alert('Connection failed: ' + error.message);
-        console.error(error);
-        return;
-      }
-      sb.GroupChannel.createChannelWithUserIds([USER_ID, TEST_USER], true, 'Test Channel', '', '', function(channel, error) {
+let sb, channel, USER_ID, USER_NAME;
+
+// Helper: Proper case for name
+function toProperCase(str) {
+  return str.toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
+}
+
+// Step 1: PIN Verification
+async function verifyPin() {
+  const pin = document.getElementById("pinInput").value.trim();
+  if (!pin) return showPinError("Please enter a PIN");
+  document.getElementById("pinMessage").textContent = "Checking PIN...";
+
+  try {
+    const url = `https://docs.google.com/spreadsheets/d/${sheetID}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(pinSheetName)}`;
+    const response = await fetch(url);
+    const data = await response.text();
+    const json = JSON.parse(data.substr(47).slice(0, -2));
+    const userRow = json.table.rows.find(row => row.c[11]?.v?.toString() === pin);
+
+    if (!userRow) return showPinError("Invalid PIN");
+
+    USER_NAME = toProperCase(userRow.c[0].v);
+    USER_ID = pin; // Use PIN as unique user_id
+
+    document.getElementById("pinSection").style.display = "none";
+    document.getElementById("chatSection").style.display = "block";
+    document.getElementById("userWelcome").innerHTML = `<b>Welcome, ${USER_NAME}</b>`;
+
+    startChat();
+  } catch (error) {
+    showPinError("Error verifying PIN");
+    console.error(error);
+  }
+}
+
+function showPinError(message) {
+  document.getElementById("pinMessage").textContent = message;
+}
+
+// Step 2: Connect to Sendbird and set up chat
+function startChat() {
+  sb = new SendBird({ appId: APP_ID });
+  sb.connect(USER_ID, function(user, error) {
+    if (error) {
+      alert('Connection failed: ' + error.message);
+      console.error(error);
+      return;
+    }
+    sb.updateCurrentUserInfo(USER_NAME, null, function() {});
+    joinOrCreateChannel();
+  });
+}
+
+// Step 3: Join or create the main group channel
+function joinOrCreateChannel() {
+  // Try to find the channel first
+  const query = sb.GroupChannel.createMyGroupChannelListQuery();
+  query.includeEmpty = true;
+  query.next((channels, error) => {
+    if (error) {
+      alert('Channel query failed: ' + error.message);
+      console.error(error);
+      return;
+    }
+    let found = channels.find(c => c.name === CHANNEL_NAME);
+    if (found) {
+      channel = found;
+      setupMessaging();
+    } else {
+      // Create the channel if it doesn't exist
+      sb.GroupChannel.createChannel({
+        name: CHANNEL_NAME,
+        isDistinct: false,
+        userIds: [USER_ID], // Only you for now; others will join with same name
+        customType: "general"
+      }, function(newChannel, error) {
         if (error) {
           alert('Channel creation failed: ' + error.message);
           console.error(error);
           return;
         }
-        const messagesDiv = document.getElementById('messages');
-        // Load previous messages
-        const messageListQuery = channel.createPreviousMessageListQuery();
-        messageListQuery.load(20, true, function(messages, error) {
-          if (!error) {
-            messages.forEach(msg => {
-              const p = document.createElement('p');
-              p.textContent = `${msg.sender.userId}: ${msg.message}`;
-              messagesDiv.appendChild(p);
-            });
-            messagesDiv.scrollTop = messagesDiv.scrollHeight;
-          }
-        });
-        // Send messages
-        document.getElementById('sendBtn').onclick = function() {
-          const input = document.getElementById('messageInput');
-          const msg = input.value.trim();
-          if (!msg) return;
-          channel.sendUserMessage(msg, function(message, error) {
-            if (error) {
-              alert('Send failed: ' + error.message);
-              console.error(error);
-            } else {
-              const p = document.createElement('p');
-              p.textContent = `${message.sender.userId}: ${message.message}`;
-              messagesDiv.appendChild(p);
-              messagesDiv.scrollTop = messagesDiv.scrollHeight;
-              input.value = '';
-            }
-          });
-        };
+        channel = newChannel;
+        setupMessaging();
       });
+    }
+  });
+}
+
+// Step 4: Setup messaging
+function setupMessaging() {
+  const messagesDiv = document.getElementById('messages');
+  messagesDiv.innerHTML = "";
+
+  // Load previous messages
+  const messageListQuery = channel.createPreviousMessageListQuery();
+  messageListQuery.load(50, true, function(messages, error) {
+    if (!error) {
+      messages.forEach(msg => {
+        appendMessage(msg);
+      });
+      messagesDiv.scrollTop = messagesDiv.scrollHeight;
+    }
+  });
+
+  // Real-time messages
+  const handler = new sb.ChannelHandler();
+  handler.onMessageReceived = (targetChannel, message) => {
+    if (channel.url === targetChannel.url) appendMessage(message);
+  };
+  sb.addChannelHandler('main_handler', handler);
+
+  // Send message handler
+  document.getElementById('sendBtn').onclick = function() {
+    const input = document.getElementById('messageInput');
+    const msg = input.value.trim();
+    if (!msg) return;
+    channel.sendUserMessage(msg, function(message, error) {
+      if (error) {
+        alert('Send failed: ' + error.message);
+        console.error(error);
+      } else {
+        input.value = '';
+        // Message will be appended by onMessageReceived
+      }
     });
-  </script>
+  };
+}
+
+function appendMessage(msg) {
+  const div = document.createElement("div");
+  div.textContent = `${msg.sender.nickname}: ${msg.message}`;
+  div.style.color = (msg.sender.userId === USER_ID) ? "#D32F2F" : "#ccc";
+  document.getElementById("messages").appendChild(div);
+  document.getElementById("messages").scrollTop = document.getElementById("messages").scrollHeight;
+}
+</script>
 </body>
 </html>
