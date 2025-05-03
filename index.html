@@ -1,13 +1,13 @@
-<!DOCTYPE html>
 <html>
 <head>
   <title>Sendbird Chat v3 Demo</title>
+  <!-- Axios must come first! -->
+  <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/sendbird/3.1.13/SendBird.min.js"></script>
   <style>
-    body { background: #000; color: #ccc; font-family: Arial, sans-serif; }
-    #messages { border: 1px solid #333; height: 300px; overflow: auto; padding: 10px; margin-bottom: 10px; background: #181818; }
-    #messageInput { width: 80%; padding: 8px; background: #222; color: #fff; border: 1px solid #333; }
-    #sendBtn { padding: 8px 15px; background: #D32F2F; color: white; border: none; cursor: pointer; }
+    #messages { border: 1px solid #ccc; height: 300px; overflow: auto; padding: 10px; margin-bottom: 10px; }
+    #messageInput { width: 80%; padding: 8px; }
+    #sendBtn { padding: 8px 15px; background: #4CAF50; color: white; border: none; }
   </style>
 </head>
 <body>
@@ -20,69 +20,52 @@
     const USER_ID = 'user_' + Math.floor(Math.random() * 10000);
     const TEST_USER = 'test_user_123';
 
-    console.log("Starting Sendbird connection...");
     const sb = new SendBird({ appId: APP_ID });
 
     sb.connect(USER_ID, function(user, error) {
       if (error) {
-        console.error("Connection failed:", error);
         alert('Connection failed: ' + error.message);
+        console.error(error);
         return;
       }
-      console.log("Connected. Creating channel...");
-      
-      sb.GroupChannel.createChannelWithUserIds(
-        [USER_ID, TEST_USER],
-        true,
-        'Test Channel',
-        '',
-        '',
-        function(channel, error) {
-          if (error) {
-            console.error("Channel creation failed:", error);
-            alert('Channel creation failed: ' + error.message);
-            return;
-          }
-          console.log("Channel created:", channel.url);
-          
-          const messagesDiv = document.getElementById('messages');
-          const messageListQuery = channel.createPreviousMessageListQuery();
-          messageListQuery.load(20, true, function(messages, error) {
-            if (error) {
-              console.error("Message load failed:", error);
-              return;
-            }
-            console.log("Loaded messages:", messages.length);
+      sb.GroupChannel.createChannelWithUserIds([USER_ID, TEST_USER], true, 'Test Channel', '', '', function(channel, error) {
+        if (error) {
+          alert('Channel creation failed: ' + error.message);
+          console.error(error);
+          return;
+        }
+        const messagesDiv = document.getElementById('messages');
+        // Load previous messages
+        const messageListQuery = channel.createPreviousMessageListQuery();
+        messageListQuery.load(20, true, function(messages, error) {
+          if (!error) {
             messages.forEach(msg => {
               const p = document.createElement('p');
               p.textContent = `${msg.sender.userId}: ${msg.message}`;
               messagesDiv.appendChild(p);
             });
             messagesDiv.scrollTop = messagesDiv.scrollHeight;
-          });
-
-          document.getElementById('sendBtn').onclick = function() {
-            const input = document.getElementById('messageInput');
-            const msg = input.value.trim();
-            if (!msg) return;
-            
-            console.log("Sending message:", msg);
-            channel.sendUserMessage(msg, function(message, error) {
-              if (error) {
-                console.error("Send failed:", error);
-                alert('Send failed: ' + error.message);
-                return;
-              }
-              console.log("Message sent:", message);
+          }
+        });
+        // Send messages
+        document.getElementById('sendBtn').onclick = function() {
+          const input = document.getElementById('messageInput');
+          const msg = input.value.trim();
+          if (!msg) return;
+          channel.sendUserMessage(msg, function(message, error) {
+            if (error) {
+              alert('Send failed: ' + error.message);
+              console.error(error);
+            } else {
               const p = document.createElement('p');
               p.textContent = `${message.sender.userId}: ${message.message}`;
               messagesDiv.appendChild(p);
               messagesDiv.scrollTop = messagesDiv.scrollHeight;
               input.value = '';
-            });
-          };
-        }
-      );
+            }
+          });
+        };
+      });
     });
   </script>
 </body>
